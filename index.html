@@ -1,59 +1,444 @@
-<div>Teachable Machine Image Model</div>
-<button type="button" onclick="init()">Start</button>
-<div id="webcam-container"></div>
-<div id="label-container"></div>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
-<script type="text/javascript">
-    // More API functions here:
-    // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/image
-
-    // the link to your model provided by Teachable Machine export panel
-    const URL = "./my_model/";
-
-    let model, webcam, labelContainer, maxPredictions;
-
-    // Load the image model and setup the webcam
-    async function init() {
-        const modelURL = URL + "model.json";
-        const metadataURL = URL + "metadata.json";
-
-        // load the model and metadata
-        // Refer to tmImage.loadFromFiles() in the API to support files from a file picker
-        // or files from your local hard drive
-        // Note: the pose library adds "tmImage" object to your window (window.tmImage)
-        model = await tmImage.load(modelURL, metadataURL);
-        maxPredictions = model.getTotalClasses();
-
-        // Convenience function to setup a webcam
-        const flip = true; // whether to flip the webcam
-        webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
-        await webcam.setup(); // request access to the webcam
-        await webcam.play();
-        window.requestAnimationFrame(loop);
-
-        // append elements to the DOM
-        document.getElementById("webcam-container").appendChild(webcam.canvas);
-        labelContainer = document.getElementById("label-container");
-        for (let i = 0; i < maxPredictions; i++) { // and class labels
-            labelContainer.appendChild(document.createElement("div"));
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#fff8e8">
+    <title>묵찌빠 연구소</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Gowun+Dodum&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            font-family: "Gowun Dodum", sans-serif;
+            color: #23324a;
+            background: #fff8e8;
+            font-synthesis: none;
         }
-    }
 
-    async function loop() {
-        webcam.update(); // update the webcam frame
-        await predict();
-        window.requestAnimationFrame(loop);
-    }
+        * { box-sizing: border-box; }
 
-    // run the webcam image through the image model
-    async function predict() {
-        // predict can take in an image, video or canvas html element
-        const prediction = await model.predict(webcam.canvas);
-        for (let i = 0; i < maxPredictions; i++) {
-            const classPrediction =
-                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
-            labelContainer.childNodes[i].innerHTML = classPrediction;
+        body {
+            min-width: 320px;
+            min-height: 100vh;
+            margin: 0;
+            background-image: radial-gradient(#f4d78f 1.5px, transparent 1.5px), linear-gradient(135deg, #fff8e8, #fff1d2 55%, #e8f8f2);
+            background-size: 24px 24px, auto;
         }
-    }
-</script>
+
+        button { font: inherit; }
+
+        .page-shell {
+            width: min(1120px, 100% - 40px);
+            margin: 0 auto;
+            padding: 34px 0 42px;
+        }
+
+        .topline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+
+        .brand, .round-label, .eyebrow, .start-button, .prediction-score {
+            font-family: "Fredoka", "Gowun Dodum", sans-serif;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .brand-mark {
+            display: grid;
+            width: 42px;
+            height: 42px;
+            place-items: center;
+            border: 2px solid #263851;
+            border-radius: 14px;
+            background: #ffcb55;
+            box-shadow: 3px 3px 0 #263851;
+            font-size: 23px;
+        }
+
+        .round-label {
+            padding: 8px 13px;
+            border: 1.5px solid #bfded5;
+            border-radius: 999px;
+            background: #f2fffa;
+            color: #397f68;
+            font-size: 14px;
+        }
+
+        .hero { margin-bottom: 24px; }
+
+        .eyebrow {
+            margin: 0 0 8px;
+            color: #e87946;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 48px;
+            line-height: 1.2;
+        }
+
+        .hero-copy {
+            margin: 10px 0 0;
+            color: #617087;
+            font-size: 17px;
+        }
+
+        .game-layout {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(300px, 0.8fr);
+            gap: 22px;
+            align-items: stretch;
+        }
+
+        .camera-panel, .results-panel {
+            border: 2px solid #263851;
+            border-radius: 24px;
+            background: #fff;
+            box-shadow: 6px 6px 0 #263851;
+        }
+
+        .camera-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px;
+        }
+
+        .panel-heading {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 17px;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .live-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #fff0eb;
+            color: #c85d3e;
+            font-size: 13px;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #f26b50;
+            animation: blink 1.4s infinite;
+        }
+
+        #webcam-container {
+            display: grid;
+            width: min(100%, 440px);
+            aspect-ratio: 1;
+            place-items: center;
+            overflow: hidden;
+            border: 4px solid #263851;
+            border-radius: 22px;
+            background: repeating-linear-gradient(45deg, #f3fbf7, #f3fbf7 14px, #eaf6ef 14px, #eaf6ef 28px);
+        }
+
+        #webcam-container canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .camera-placeholder {
+            padding: 24px;
+            color: #748397;
+            text-align: center;
+        }
+
+        .camera-placeholder span {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 48px;
+        }
+
+        #status-message {
+            min-height: 24px;
+            margin: 13px 0 0;
+            color: #617087;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .start-button {
+            width: min(100%, 440px);
+            min-height: 58px;
+            margin-top: 15px;
+            border: 2px solid #263851;
+            border-radius: 16px;
+            background: #ffcb55;
+            box-shadow: 0 4px 0 #263851;
+            color: #263851;
+            cursor: pointer;
+            font-size: 19px;
+            font-weight: 700;
+            transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+        }
+
+        .start-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            background: #ffd879;
+            box-shadow: 0 6px 0 #263851;
+        }
+
+        .start-button:active:not(:disabled) {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 #263851;
+        }
+
+        .start-button:disabled { cursor: wait; opacity: 0.75; }
+
+        .results-panel { padding: 24px; }
+
+        .results-title {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin-bottom: 7px;
+        }
+
+        .results-title span { font-size: 25px; }
+
+        .results-intro {
+            margin: 0 0 24px;
+            color: #718096;
+            font-size: 14px;
+        }
+
+        #label-container {
+            display: grid;
+            gap: 16px;
+        }
+
+        .prediction-row { display: grid; gap: 8px; }
+
+        .prediction-topline {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 12px;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .prediction-label { display: inline-flex; align-items: center; gap: 9px; }
+        .prediction-emoji { font-size: 23px; }
+        .prediction-score { color: #496078; font-size: 16px; }
+
+        .meter {
+            height: 18px;
+            overflow: hidden;
+            border: 1px solid #d6e0e5;
+            border-radius: 999px;
+            background: #f0f4f4;
+        }
+
+        .meter-fill {
+            width: 0;
+            height: 100%;
+            border-radius: inherit;
+            transition: width 180ms ease-out;
+        }
+
+        .prediction-row:nth-child(1) .meter-fill { background: #ffbd4a; }
+        .prediction-row:nth-child(2) .meter-fill { background: #72cdb2; }
+        .prediction-row:nth-child(3) .meter-fill { background: #ff8c76; }
+
+        .tip {
+            display: flex;
+            gap: 10px;
+            margin-top: 26px;
+            padding: 13px 14px;
+            border-radius: 14px;
+            background: #f2fbf7;
+            color: #4e7567;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .tip > span:first-child { flex: 0 0 auto; }
+        .tip > span:last-child { min-width: 0; }
+
+        .footer-note {
+            margin: 25px 0 0;
+            color: #8190a1;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        @keyframes blink { 50% { opacity: 0.35; } }
+
+        @media (max-width: 760px) {
+            .page-shell { width: min(560px, 100% - 28px); padding-top: 22px; }
+            .topline { margin-bottom: 22px; }
+            .game-layout { grid-template-columns: 1fr; gap: 18px; }
+            .camera-panel, .results-panel { border-radius: 20px; box-shadow: 4px 4px 0 #263851; }
+            .camera-panel, .results-panel { padding: 18px; }
+            h1 { font-size: 34px; }
+            .hero-copy { font-size: 15px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+        }
+    </style>
+</head>
+<body>
+    <main class="page-shell">
+        <header class="topline">
+            <div class="brand"><span class="brand-mark" aria-hidden="true">✊</span> 묵찌빠 연구소</div>
+            <span class="round-label">오늘도 신나게 한 판!</span>
+        </header>
+
+        <section class="hero" aria-labelledby="page-title">
+            <p class="eyebrow">READY, SET, GO!</p>
+            <h1 id="page-title">내 손은 무엇일까요?</h1>
+            <p class="hero-copy">카메라 앞에서 묵, 찌, 빠를 보여 주세요. AI 친구가 맞혀 볼게요!</p>
+        </section>
+
+        <section class="game-layout" aria-label="묵찌빠 인식 화면">
+            <div class="camera-panel">
+                <div class="panel-heading">
+                    <h2>손 모양 보여 주기</h2>
+                    <span class="live-badge"><span class="live-dot" aria-hidden="true"></span> 카메라</span>
+                </div>
+                <div id="webcam-container">
+                    <div class="camera-placeholder"><span aria-hidden="true">📷</span>시작 버튼을 누르면<br>여기에 카메라가 보여요</div>
+                </div>
+                <p id="status-message" role="status" aria-live="polite">카메라를 켜고 묵찌빠를 시작해요.</p>
+                <button class="start-button" id="start-button" type="button" onclick="init()">🎮 시작하기</button>
+            </div>
+
+            <aside class="results-panel" aria-labelledby="results-heading">
+                <div class="results-title"><span aria-hidden="true">✨</span><h2 id="results-heading">AI 친구의 생각</h2></div>
+                <p class="results-intro">어떤 손 모양이라고 생각하는지 확인해 봐요.</p>
+                <div id="label-container" aria-live="polite"></div>
+                <div class="tip"><span aria-hidden="true">💡</span><span>손을 화면 가운데에 보여 주면 더 잘 알아봐요. 밝은 곳에서 해 보면 더 좋아요!</span></div>
+            </aside>
+        </section>
+        <p class="footer-note">손을 움직이며 여러 가지 모양을 시험해 보세요!</p>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <script>
+        const URL = "./my_model/";
+        const handEmojis = { "묵": "✊", "찌": "✌️", "빠": "🖐️" };
+        let model, webcam, maxPredictions;
+        let isStarting = false;
+
+        async function init() {
+            if (isStarting || webcam) return;
+            isStarting = true;
+            const startButton = document.getElementById("start-button");
+            const statusMessage = document.getElementById("status-message");
+            startButton.disabled = true;
+            startButton.textContent = "⏳ 준비하고 있어요...";
+            statusMessage.textContent = "AI 친구와 카메라를 준비하고 있어요.";
+
+            try {
+                model = await tmImage.load(URL + "model.json", URL + "metadata.json");
+                maxPredictions = model.getTotalClasses();
+
+                webcam = new tmImage.Webcam(420, 420, true);
+                await webcam.setup();
+                await webcam.play();
+
+                const webcamContainer = document.getElementById("webcam-container");
+                webcamContainer.replaceChildren(webcam.canvas);
+                const labelContainer = document.getElementById("label-container");
+                labelContainer.replaceChildren();
+                for (let index = 0; index < maxPredictions; index++) {
+                    const row = document.createElement("div");
+                    row.className = "prediction-row";
+
+                    const topline = document.createElement("div");
+                    topline.className = "prediction-topline";
+                    const label = document.createElement("span");
+                    label.className = "prediction-label";
+                    const emoji = document.createElement("span");
+                    emoji.className = "prediction-emoji";
+                    emoji.setAttribute("aria-hidden", "true");
+                    const name = document.createElement("span");
+                    const score = document.createElement("span");
+                    score.className = "prediction-score";
+                    label.append(emoji, name);
+                    topline.append(label, score);
+
+                    const meter = document.createElement("div");
+                    meter.className = "meter";
+                    meter.setAttribute("role", "meter");
+                    meter.setAttribute("aria-valuemin", "0");
+                    meter.setAttribute("aria-valuemax", "100");
+                    const fill = document.createElement("div");
+                    fill.className = "meter-fill";
+                    meter.appendChild(fill);
+                    row.append(topline, meter);
+                    labelContainer.appendChild(row);
+                }
+
+                startButton.textContent = "✅ 인식 중이에요!";
+                statusMessage.textContent = "좋아요! 손 모양을 카메라에 보여 주세요.";
+                window.requestAnimationFrame(loop);
+            } catch (error) {
+                console.error(error);
+                statusMessage.textContent = "카메라를 시작할 수 없어요. 카메라 권한과 웹서버 연결을 확인해 주세요.";
+                startButton.disabled = false;
+                startButton.textContent = "🔄 다시 시작하기";
+                webcam = null;
+            } finally {
+                isStarting = false;
+            }
+        }
+
+        async function loop() {
+            webcam.update();
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            const rows = document.getElementById("label-container").children;
+            for (let index = 0; index < maxPredictions; index++) {
+                const probability = prediction[index].probability;
+                const row = rows[index];
+                row.querySelector(".prediction-emoji").textContent = handEmojis[prediction[index].className] || "🌟";
+                row.querySelector(".prediction-label span:last-child").textContent = prediction[index].className;
+                row.querySelector(".prediction-score").textContent = `${Math.round(probability * 100)}%`;
+                row.querySelector(".meter-fill").style.width = `${probability * 100}%`;
+                row.querySelector(".meter").setAttribute("aria-valuenow", Math.round(probability * 100));
+            }
+        }
+    </script>
+</body>
+</html>
